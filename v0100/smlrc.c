@@ -37,6 +37,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*                                                                           */
 /*****************************************************************************/
 
+// *PP64
+#define MIPS
+
 // Making most functions static helps with code optimization,
 // use that to further reduce compiler's code size on RetroBSD.
 #ifndef STATIC

@@ -235,6 +235,8 @@ void GenRecordFxnSize(char* startLabelName, int endLabelNo)
 #define MipsInstrXori   0x2A
 #define MipsInstrOri    0x2B
 #define MipsInstrJR     0x2C
+#define MipsInstrSLTI   0x9D
+#define MipsInstrSLTIU  0x9E
 
 STATIC
 void GenPrintInstr(int instr, int val)
@@ -289,6 +291,8 @@ void GenPrintInstr(int instr, int val)
   case MipsInstrXori : p = "xori"; break;
   case MipsInstrOri  : p = "ori"; break;
   case MipsInstrJR   : p = "jr"; break;
+  case MipsInstrSLTI : p = "slti"; break;
+  case MipsInstrSLTIU: p = "sltiu"; break;
   }
 
   printf2("\t%s\t", p);
@@ -1448,6 +1452,7 @@ void GenCmp(int* idx, int op)
   int condbranch = (*idx + 1 < sp) ? (stack[*idx + 1][0] == tokIf) + (stack[*idx + 1][0] == tokIfNot) * 2 : 0;
   int unsign = op >> 4;
   int slt = unsign ? MipsInstrSLTU : MipsInstrSLT;
+  int slti = unsign ? MipsInstrSLTIU : MipsInstrSLTI;
   int label = condbranch ? stack[*idx + 1][1] : 0;
   char* p;
   int i;
@@ -1526,7 +1531,7 @@ void GenCmp(int* idx, int op)
                              MipsOpRegZero, 0);
       break;
     case 'l':
-      GenPrintInstr3Operands(slt, 0,
+      GenPrintInstr3Operands(slti, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, 1);
@@ -1535,7 +1540,7 @@ void GenCmp(int* idx, int op)
       constval++;
       // fallthrough
     case 'm':
-      GenPrintInstr3Operands(slt, 0,
+      GenPrintInstr3Operands(slti, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, constval);
@@ -1553,7 +1558,7 @@ void GenCmp(int* idx, int op)
                              GenWreg, 0);
       break;
     case 'q':
-      GenPrintInstr3Operands(MipsInstrSLTU, 0,
+      GenPrintInstr3Operands(MipsInstrSLTIU, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, 1);
@@ -1816,7 +1821,6 @@ void GenExpr0(void)
 
     case '+':
     case '-':
-    case '*':
     case '&':
     case '^':
     case '|':
@@ -1845,6 +1849,35 @@ void GenExpr0(void)
                                GenWreg, 0,
                                GenLreg, 0,
                                GenRreg, 0);
+      }
+      break;
+
+    // *PP64 added case to reduce to 2 regs + mflo
+    case '*':
+      if (stack[i - 1][0] == tokNumInt && tok != '*')
+      {
+        int theconst = stack[i - 1][1];
+        int instr = GenGetBinaryOperatorInstr(tok);
+        instr = GenImmediateVersionOfInstr(instr);
+        if (instr == MipsInstrSubU) {
+          instr = MipsInstrAddiu;
+          theconst = -theconst;
+        }
+        GenPrintInstr2Operands(instr, 0,
+                               GenWreg, 0,
+                               MipsOpConst, theconst);
+        GenPrintInstr1Operand(MipsInstrMfLo, 0,
+                                GenWreg, 0);
+      }
+      else
+      {
+        int instr = GenGetBinaryOperatorInstr(tok);
+        GenPopReg();
+        GenPrintInstr2Operands(instr, 0,
+                               GenLreg, 0,
+                               GenRreg, 0);
+        GenPrintInstr1Operand(MipsInstrMfLo, 0,
+                                GenWreg, 0);
       }
       break;
 
@@ -1947,7 +1980,6 @@ void GenExpr0(void)
 
     case tokAssignAdd:
     case tokAssignSub:
-    case tokAssignMul:
     case tokAssignAnd:
     case tokAssignXor:
     case tokAssignOr:
@@ -2001,6 +2033,62 @@ void GenExpr0(void)
                                GenWreg, 0,
                                GenWreg, 0,
                                rsaved, 0);
+        GenWriteIndirect(lsaved, GenWreg, v);
+      }
+      GenExtendRegIfNeeded(GenWreg, v);
+      break;
+
+    // *PP64 split this out and fix the 3 regs issue.
+    case tokAssignMul:
+      if (stack[i - 1][0] == tokRevLocalOfs || stack[i - 1][0] == tokRevIdent)
+      {
+        int instr = GenGetBinaryOperatorInstr(tok);
+
+        if (stack[i - 1][0] == tokRevLocalOfs)
+          GenReadLocal(TEMP_REG_B, v, stack[i - 1][1]);
+        else
+          GenReadIdent(TEMP_REG_B, v, stack[i - 1][1]);
+
+        GenPrintInstr2Operands(instr, 0,
+                               TEMP_REG_B, 0,
+                               GenWreg, 0);
+        GenPrintInstr1Operand(MipsInstrMfLo, 0,
+                                GenWreg, 0);
+
+        if (stack[i - 1][0] == tokRevLocalOfs)
+          GenWriteLocal(GenWreg, v, stack[i - 1][1]);
+        else
+          GenWriteIdent(GenWreg, v, stack[i - 1][1]);
+      }
+      else
+      {
+        int instr = GenGetBinaryOperatorInstr(tok);
+        int lsaved, rsaved;
+        GenPopReg();
+        if (GenWreg == GenLreg)
+        {
+          GenPrintInstr2Operands(MipsInstrMov, 0,
+                                 TEMP_REG_B, 0,
+                                 GenLreg, 0);
+          lsaved = TEMP_REG_B;
+          rsaved = GenRreg;
+        }
+        else
+        {
+          // GenWreg == GenRreg here
+          GenPrintInstr2Operands(MipsInstrMov, 0,
+                                 TEMP_REG_B, 0,
+                                 GenRreg, 0);
+          rsaved = TEMP_REG_B;
+          lsaved = GenLreg;
+        }
+
+        GenReadIndirect(GenWreg, GenLreg, v); // destroys either GenLreg or GenRreg because GenWreg coincides with one of them
+        GenPrintInstr2Operands(instr, 0,
+                               GenWreg, 0,
+                               rsaved, 0);
+        GenPrintInstr1Operand(MipsInstrMfLo, 0,
+                                GenWreg, 0);
         GenWriteIndirect(lsaved, GenWreg, v);
       }
       GenExtendRegIfNeeded(GenWreg, v);

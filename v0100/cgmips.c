@@ -34,7 +34,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*****************************************************************************/
 
 // Works around bugs in RetroBSD's as instruction reordering
-//#define REORDER_WORKAROUND
+// *PP64 insert NOPs
+#define REORDER_WORKAROUND
+
+// *PP64 use SLL and SRL
+#define DONT_USE_SEH
+// *PP64 less noisy
+#define NO_ANNOTATIONS
+
+// *PP64 All addu and subu that were acting on immediates changed to addiu
 
 STATIC
 void GenInit(void)
@@ -42,13 +50,19 @@ void GenInit(void)
   // initialization of target-specific code generator
   SizeOfWord = 4;
   OutputFormat = FormatSegmented;
-  CodeHeaderFooter[0] = "\t.text";
-  DataHeaderFooter[0] = "\t.data";
-  RoDataHeaderFooter[0] = "\t.rdata";
-  BssHeaderFooter[0] = "\t.bss";
+  // *PP64 no indent
+  CodeHeaderFooter[0] = ".text";
+  DataHeaderFooter[0] = ".data";
+  RoDataHeaderFooter[0] = ".rdata";
+  BssHeaderFooter[0] = ".bss";
+  // CodeHeaderFooter[0] = "\t; text";
+  // DataHeaderFooter[0] = "\t; data";
+  // RoDataHeaderFooter[0] = "\t; rdata";
+  // BssHeaderFooter[0] = "\t; bss";
   UseLeadingUnderscores = 0;
 #ifdef REORDER_WORKAROUND
-  FileHeader = "\t.set\tnoreorder";
+  // *PP64 this directive is not understood
+  FileHeader =  ""; //"\t.set\tnoreorder";
 #else
   FileHeader = "\t.set\treorder";
 #endif
@@ -77,7 +91,7 @@ void GenInitFinalize(void)
 STATIC
 void GenStartCommentLine(void)
 {
-  printf2(" # ");
+  printf2(" ; "); // *PP64 use semi-colon
 }
 
 STATIC
@@ -101,8 +115,9 @@ STATIC
 void GenPrintLabel(char* Label)
 {
   {
+    // *PP64 use Lcmpbranch* for labels instead of $L*
     if (isdigit(*Label))
-      printf2("$L%s", Label);
+      printf2("Lcmpbranch%s", Label);
     else
       printf2("%s", Label);
   }
@@ -111,20 +126,21 @@ void GenPrintLabel(char* Label)
 STATIC
 void GenNumLabel(int Label)
 {
-  printf2("$L%d:\n", Label);
+  printf2("Lcmpbranch%d:\n", Label);
 }
 
 STATIC
 void GenPrintNumLabel(int label)
 {
-  printf2("$L%d", label);
+  printf2("Lcmpbranch%d", label);
 }
 
 STATIC
 void GenZeroData(unsigned Size, int bss)
 {
   (void)bss;
-  printf2("\t.space\t%u\n", truncUint(Size)); // or ".fill size"
+  // *PP64 use .fill instead of .space
+  printf2("\t.fill\t%u\n", truncUint(Size)); // or ".fill size"
 }
 
 STATIC
@@ -134,7 +150,7 @@ void GenIntData(int Size, int Val)
   if (Size == 1)
     printf2("\t.byte\t%d\n", Val);
   else if (Size == 2)
-    printf2("\t.half\t%d\n", Val);
+    printf2("\t.halfword\t%d\n", Val); // *PP64 use .halfword instead of .half
   else if (Size == 4)
     printf2("\t.word\t%d\n", Val);
 }
@@ -152,7 +168,7 @@ void GenAddrData(int Size, char* Label, int ofs)
   if (Size == 1)
     printf2("\t.byte\t");
   else if (Size == 2)
-    printf2("\t.half\t");
+    printf2("\t.halfword\t"); // *PP64 use .halfword instead of .half
   else if (Size == 4)
     printf2("\t.word\t");
   GenPrintLabel(Label);
@@ -213,6 +229,12 @@ void GenRecordFxnSize(char* startLabelName, int endLabelNo)
 #define MipsInstrBGTZ   0x25
 #define MipsInstrSeb    0x26
 #define MipsInstrSeh    0x27
+// *PP64 added:
+#define MipsInstrAddiu  0x28
+#define MipsInstrAndi   0x29
+#define MipsInstrXori   0x2A
+#define MipsInstrOri    0x2B
+#define MipsInstrJR     0x2C
 
 STATIC
 void GenPrintInstr(int instr, int val)
@@ -227,7 +249,7 @@ void GenPrintInstr(int instr, int val)
   case MipsInstrMov  : p = "move"; break;
   case MipsInstrMfLo : p = "mflo"; break;
   case MipsInstrMfHi : p = "mfhi"; break;
-  case MipsInstrLA   : p = "la"; break;
+  case MipsInstrLA   : p = "li"; break; // *PP64 use li
   case MipsInstrLI   : p = "li"; break;
 //  case MipsInstrLUI  : p = "lui"; break;
   case MipsInstrLB   : p = "lb"; break;
@@ -247,7 +269,7 @@ void GenPrintInstr(int instr, int val)
   case MipsInstrSLL  : p = "sll"; break;
   case MipsInstrSRL  : p = "srl"; break;
   case MipsInstrSRA  : p = "sra"; break;
-  case MipsInstrMul  : p = "mul"; break;
+  case MipsInstrMul  : p = "mult"; break; // *PP64 was "mul"
   case MipsInstrDiv  : p = "div"; break;
   case MipsInstrDivU : p = "divu"; break;
   case MipsInstrSLT  : p = "slt"; break;
@@ -262,6 +284,11 @@ void GenPrintInstr(int instr, int val)
   case MipsInstrBGTZ : p = "bgtz"; break;
   case MipsInstrSeb  : p = "seb"; break;
   case MipsInstrSeh  : p = "seh"; break;
+  case MipsInstrAddiu: p = "addiu"; break;
+  case MipsInstrAndi : p = "andi"; break;
+  case MipsInstrXori : p = "xori"; break;
+  case MipsInstrOri  : p = "ori"; break;
+  case MipsInstrJR   : p = "jr"; break;
   }
 
   printf2("\t%s\t", p);
@@ -346,7 +373,9 @@ void GenPrintOperand(int op, int val)
     {
     case MipsOpConst: printf2("%d", truncInt(val)); break;
     case MipsOpLabelLo:
-      printf2("%%lo(");
+      // *PP64 plain lo() instead of %%lo()
+      //printf2("%%lo(");
+      printf2("lo(");
       GenPrintLabel(IdentTable + val);
       printf2(")($1)");
       break;
@@ -381,7 +410,7 @@ void GenPrintInstr1Operand(int instr, int instrval, int operand, int operandval)
   GenPrintNewLine();
 
 #ifdef REORDER_WORKAROUND
-  if (instr == MipsInstrJ || instr == MipsInstrJAL)
+  if (instr == MipsInstrJ || instr == MipsInstrJR || instr == MipsInstrJAL)
     GenNop();
 #endif
 }
@@ -390,7 +419,7 @@ STATIC
 void GenPrintInstr2Operands(int instr, int instrval, int operand1, int operand1val, int operand2, int operand2val)
 {
   if (operand2 == MipsOpConst && operand2val == 0 &&
-      (instr == MipsInstrAddU || instr == MipsInstrSubU))
+      (instr == MipsInstrAddU || instr == MipsInstrSubU || instr == MipsInstrAddiu))
     return;
 
   GenPrintInstr(instr, instrval);
@@ -412,7 +441,7 @@ void GenPrintInstr3Operands(int instr, int instrval,
                             int operand3, int operand3val)
 {
   if (operand3 == MipsOpConst && operand3val == 0 &&
-      (instr == MipsInstrAddU || instr == MipsInstrSubU) &&
+      (instr == MipsInstrAddU || instr == MipsInstrSubU || instr == MipsInstrAddiu) &&
       operand1 == operand2)
     return;
 
@@ -452,7 +481,7 @@ void GenExtendRegIfNeeded(int reg, int opSz)
   }
   else if (opSz == 1)
   {
-    GenPrintInstr3Operands(MipsInstrAnd, 0,
+    GenPrintInstr3Operands(MipsInstrAndi, 0,
                            reg, 0,
                            reg, 0,
                            MipsOpConst, 0xFF);
@@ -476,7 +505,7 @@ void GenExtendRegIfNeeded(int reg, int opSz)
   }
   else if (opSz == 2)
   {
-    GenPrintInstr3Operands(MipsInstrAnd, 0,
+    GenPrintInstr3Operands(MipsInstrAndi, 0,
                            reg, 0,
                            reg, 0,
                            MipsOpConst, 0xFFFF);
@@ -535,10 +564,10 @@ STATIC
 void GenWriteFrameSize(void)
 {
   unsigned size = 8/*RA + FP*/ - CurFxnMinLocalOfs;
-  printf2("\tsubu\t$29, $29, %10u\n", size); // 10 chars are enough for 32-bit unsigned ints
+  printf2("\taddiu\t$29, $29, -%-10u\n", size); // 10 chars are enough for 32-bit unsigned ints
   printf2("\tsw\t$30, %10u($29)\n", size - 8);
-  printf2("\taddu\t$30, $29, %10u\n", size - 8);
-  printf2("\t%csw\t$31, 4($30)\n", GenLeaf ? '#' : ' ');
+  printf2("\taddiu\t$30, $29, %-10u\n", size - 8);
+  printf2("\t%csw\t$31, 4($30)\n", GenLeaf ? ';' : ' '); // *PP64 use ; for comments
 }
 
 STATIC
@@ -581,10 +610,10 @@ void GenGrowStack(int size)
 {
   if (!size)
     return;
-  GenPrintInstr3Operands(MipsInstrSubU, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          MipsOpRegSp, 0,
                          MipsOpRegSp, 0,
-                         MipsOpConst, size);
+                         MipsOpConst, -size);
 }
 
 STATIC
@@ -601,12 +630,12 @@ void GenFxnEpilog(void)
                          MipsOpRegFp, 0,
                          MipsOpIndRegFp, 0);
 
-  GenPrintInstr3Operands(MipsInstrAddU, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          MipsOpRegSp, 0,
                          MipsOpRegSp, 0,
                          MipsOpConst, 8/*RA + FP*/ - CurFxnMinLocalOfs);
 
-  GenPrintInstr1Operand(MipsInstrJ, 0,
+  GenPrintInstr1Operand(MipsInstrJR, 0,
                         MipsOpRegRa, 0);
 }
 
@@ -679,10 +708,41 @@ int GenGetBinaryOperatorInstr(int tok)
   }
 }
 
+// *PP64 added
+STATIC
+int GenImmediateVersionOfInstr(int instr)
+{
+  switch (instr)
+  {
+  case MipsInstrAddU:
+    return MipsInstrAddiu;
+
+  case MipsInstrAnd:
+    return MipsInstrAndi;
+
+  case MipsInstrXor:
+    return MipsInstrXori;
+
+  case MipsInstrOr:
+    return MipsInstrOri;
+
+    // return MipsInstrMul;
+
+    // return MipsInstrDiv;
+
+    // return MipsInstrDivU;
+
+  default:
+    return instr;
+  }
+}
+
 STATIC
 void GenPreIdentAccess(int label)
 {
-  printf2("\t.set\tnoat\n\tlui\t$1, %%hi(");
+  // *PP64 hi instead of %%hi
+  // printf2("\t.set\tnoat\n\tlui\t$1, %%hi(");
+  printf2("\tlui\t$1, hi(");
   GenPrintLabel(IdentTable + label);
   puts2(")");
 }
@@ -690,7 +750,8 @@ void GenPreIdentAccess(int label)
 STATIC
 void GenPostIdentAccess(void)
 {
-  puts2("\t.set\tat");
+  // *PP64 no
+  //puts2("\t.set\tat");
 }
 
 STATIC
@@ -826,16 +887,16 @@ void GenWriteIndirect(int regDst, int regSrc, int opSz)
 STATIC
 void GenIncDecIdent(int regDst, int opSz, int label, int tok)
 {
-  int instr = MipsInstrAddU;
-
-  if (tok != tokInc)
-    instr = MipsInstrSubU;
+  int val = 1;
+  if (tok != tokInc) {
+    val = -1;
+  }
 
   GenReadIdent(regDst, opSz, label);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, 1);
+                         MipsOpConst, val);
   GenWriteIdent(regDst, opSz, label);
   GenExtendRegIfNeeded(regDst, opSz);
 }
@@ -843,16 +904,16 @@ void GenIncDecIdent(int regDst, int opSz, int label, int tok)
 STATIC
 void GenIncDecLocal(int regDst, int opSz, int ofs, int tok)
 {
-  int instr = MipsInstrAddU;
-
-  if (tok != tokInc)
-    instr = MipsInstrSubU;
+  int val = 1;
+  if (tok != tokInc) {
+    val = -1;
+  }
 
   GenReadLocal(regDst, opSz, ofs);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, 1);
+                         MipsOpConst, val);
   GenWriteLocal(regDst, opSz, ofs);
   GenExtendRegIfNeeded(regDst, opSz);
 }
@@ -860,16 +921,16 @@ void GenIncDecLocal(int regDst, int opSz, int ofs, int tok)
 STATIC
 void GenIncDecIndirect(int regDst, int regSrc, int opSz, int tok)
 {
-  int instr = MipsInstrAddU;
-
-  if (tok != tokInc)
-    instr = MipsInstrSubU;
+  int val = 1;
+  if (tok != tokInc) {
+    val = -1;
+  }
 
   GenReadIndirect(regDst, regSrc, opSz);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, 1);
+                         MipsOpConst, val);
   GenWriteIndirect(regSrc, regDst, opSz);
   GenExtendRegIfNeeded(regDst, opSz);
 }
@@ -877,63 +938,60 @@ void GenIncDecIndirect(int regDst, int regSrc, int opSz, int tok)
 STATIC
 void GenPostIncDecIdent(int regDst, int opSz, int label, int tok)
 {
-  int instr = MipsInstrAddU;
-
+  int val = 1;
   if (tok != tokPostInc)
-    instr = MipsInstrSubU;
+    val = -1;
 
   GenReadIdent(regDst, opSz, label);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, 1);
+                         MipsOpConst, val);
   GenWriteIdent(regDst, opSz, label);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, -1);
+                         MipsOpConst, -val);
   GenExtendRegIfNeeded(regDst, opSz);
 }
 
 STATIC
 void GenPostIncDecLocal(int regDst, int opSz, int ofs, int tok)
 {
-  int instr = MipsInstrAddU;
-
+  int val = 1;
   if (tok != tokPostInc)
-    instr = MipsInstrSubU;
+    val = -1;
 
   GenReadLocal(regDst, opSz, ofs);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, 1);
+                         MipsOpConst, val);
   GenWriteLocal(regDst, opSz, ofs);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, -1);
+                         MipsOpConst, -val);
   GenExtendRegIfNeeded(regDst, opSz);
 }
 
 STATIC
 void GenPostIncDecIndirect(int regDst, int regSrc, int opSz, int tok)
 {
-  int instr = MipsInstrAddU;
-
+  int val = 1;
   if (tok != tokPostInc)
-    instr = MipsInstrSubU;
+    val = -1;
 
   GenReadIndirect(regDst, regSrc, opSz);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, 1);
+                         MipsOpConst, val);
   GenWriteIndirect(regSrc, regDst, opSz);
-  GenPrintInstr3Operands(instr, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          regDst, 0,
                          regDst, 0,
-                         MipsOpConst, -1);
+                         MipsOpConst, -val);
   GenExtendRegIfNeeded(regDst, opSz);
 }
 
@@ -1017,10 +1075,10 @@ void GenPushReg(void)
     return;
   }
 
-  GenPrintInstr3Operands(MipsInstrSubU, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          MipsOpRegSp, 0,
                          MipsOpRegSp, 0,
-                         MipsOpConst, 4);
+                         MipsOpConst, -4);
 
   GenPrintInstr2Operands(MipsInstrSW, 0,
                          GenWreg, 0,
@@ -1046,7 +1104,7 @@ void GenPopReg(void)
                          TEMP_REG_A, 0,
                          MipsOpIndRegSp, 0);
 
-  GenPrintInstr3Operands(MipsInstrAddU, 0,
+  GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          MipsOpRegSp, 0,
                          MipsOpRegSp, 0,
                          MipsOpConst, 4);
@@ -1507,13 +1565,13 @@ void GenCmp(int* idx, int op)
                              GenRreg, 0);
       break;
     case 's':
-      GenPrintInstr3Operands(MipsInstrXor, 0,
+      GenPrintInstr3Operands(MipsInstrXori, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, 1);
       break;
     case 't':
-      GenPrintInstr3Operands(MipsInstrXor, 0,
+      GenPrintInstr3Operands(MipsInstrXori, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, constval);
@@ -1647,7 +1705,7 @@ void GenExpr0(void)
                            t == tokPostInc ||
                            t == tokPostDec)))
       {
-        GenPrintInstr3Operands(MipsInstrAddU, 0,
+        GenPrintInstr3Operands(MipsInstrAddiu, 0,
                                GenWreg, 0,
                                MipsOpRegFp, 0,
                                MipsOpConst, v);
@@ -1767,11 +1825,17 @@ void GenExpr0(void)
     case tokURShift:
       if (stack[i - 1][0] == tokNumInt && tok != '*')
       {
+        int theconst = stack[i - 1][1];
         int instr = GenGetBinaryOperatorInstr(tok);
+        instr = GenImmediateVersionOfInstr(instr);
+        if (instr == MipsInstrSubU) {
+          instr = MipsInstrAddiu;
+          theconst = -theconst;
+        }
         GenPrintInstr3Operands(instr, 0,
                                GenWreg, 0,
                                GenWreg, 0,
-                               MipsOpConst, stack[i - 1][1]);
+                               MipsOpConst, theconst);
       }
       else
       {
@@ -1790,14 +1854,14 @@ void GenExpr0(void)
     case tokUMod:
       {
         GenPopReg();
+
+        // *PP64 no, div does not have 3 regs...
         if (tok == '/' || tok == '%')
-          GenPrintInstr3Operands(MipsInstrDiv, 0,
-                                 MipsOpRegZero, 0,
+          GenPrintInstr2Operands(MipsInstrDiv, 0,
                                  GenLreg, 0,
                                  GenRreg, 0);
         else
-          GenPrintInstr3Operands(MipsInstrDivU, 0,
-                                 MipsOpRegZero, 0,
+          GenPrintInstr2Operands(MipsInstrDivU, 0,
                                  GenLreg, 0,
                                  GenRreg, 0);
         if (tok == '%' || tok == tokUMod)
@@ -1953,14 +2017,13 @@ void GenExpr0(void)
         else
           GenReadIdent(TEMP_REG_B, v, stack[i - 1][1]);
 
+        // *PP64 div does not have 3 regs
         if (tok == tokAssignDiv || tok == tokAssignMod)
-          GenPrintInstr3Operands(MipsInstrDiv, 0,
-                                 MipsOpRegZero, 0,
+          GenPrintInstr2Operands(MipsInstrDiv, 0,
                                  TEMP_REG_B, 0,
                                  GenWreg, 0);
         else
-          GenPrintInstr3Operands(MipsInstrDivU, 0,
-                                 MipsOpRegZero, 0,
+          GenPrintInstr2Operands(MipsInstrDivU, 0,
                                  TEMP_REG_B, 0,
                                  GenWreg, 0);
         if (tok == tokAssignMod || tok == tokAssignUMod)
@@ -1998,14 +2061,13 @@ void GenExpr0(void)
         }
 
         GenReadIndirect(GenWreg, GenLreg, v); // destroys either GenLreg or GenRreg because GenWreg coincides with one of them
+        // *PP64 div has 2 regs
         if (tok == tokAssignDiv || tok == tokAssignMod)
-          GenPrintInstr3Operands(MipsInstrDiv, 0,
-                                 MipsOpRegZero, 0,
+          GenPrintInstr2Operands(MipsInstrDiv, 0,
                                  GenWreg, 0,
                                  rsaved, 0);
         else
-          GenPrintInstr3Operands(MipsInstrDivU, 0,
-                                 MipsOpRegZero, 0,
+          GenPrintInstr2Operands(MipsInstrDivU, 0,
                                  GenWreg, 0,
                                  rsaved, 0);
         if (tok == tokAssignMod || tok == tokAssignUMod)

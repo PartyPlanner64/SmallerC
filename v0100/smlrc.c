@@ -634,7 +634,8 @@ int opsp = 0;
 // smc.c data
 
 int OutputFormat = FormatSegmented;
-int GenExterns = 1;
+// *PP64 flip externs default
+int GenExterns = 0;
 int UseBss = 1;
 
 // Names of C functions and variables are usually prefixed with an underscore.
@@ -9832,9 +9833,9 @@ int main(int argc, char** argv)
         continue;
       }
     }
-    else if (!strcmp(argv[i], "-no-externs"))
+    else if (!strcmp(argv[i], "-externs"))
     {
-      GenExterns = 0;
+      GenExterns = 1;
       continue;
     }
     else if (!strcmp(argv[i], "-verbose"))

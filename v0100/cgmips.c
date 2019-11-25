@@ -98,7 +98,7 @@ STATIC
 void GenWordAlignment(int bss)
 {
   (void)bss;
-  printf2("\t.align 2\n");
+  printf2("\t.align 4\n"); // *PP64 align 4 is safer than 2
 }
 
 STATIC

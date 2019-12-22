@@ -2240,7 +2240,7 @@ void GenExpr0(void)
 #endif
       break;
     case tokUChar:
-      GenPrintInstr3Operands(MipsInstrAnd, 0,
+      GenPrintInstr3Operands(MipsInstrAndi, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, 0xFF);
@@ -2262,7 +2262,7 @@ void GenExpr0(void)
 #endif
       break;
     case tokUShort:
-      GenPrintInstr3Operands(MipsInstrAnd, 0,
+      GenPrintInstr3Operands(MipsInstrAndi, 0,
                              GenWreg, 0,
                              GenWreg, 0,
                              MipsOpConst, 0xFFFF);

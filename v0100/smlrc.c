@@ -8242,7 +8242,7 @@ int ParseDecl(int tok, unsigned structInfo[4], int cast, int label)
           puts2(CurHeaderFooter[0]);
 
           // DONE: imperfect condition for alignment
-          if (alignment != 1)
+          //if (alignment != 1) // *PP64 always word align, aligns char ex[12] for example
             GenWordAlignment(bss);
 
           if (isGlobal)

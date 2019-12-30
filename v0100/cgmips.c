@@ -1603,6 +1603,17 @@ int GenIsCmp(int t)
     t == tokNEQ;
 }
 
+// *PP64 added for stack alignment
+// Assumes v is at least divisible by 4.
+STATIC
+int EnsureDivisibleBy8(int v)
+{
+  if ((v % 8) != 0) {
+    v += 4;
+  }
+  return v;
+}
+
 // Improved register/stack-based code generator
 // DONE: test 32-bit code generation
 STATIC
@@ -1723,7 +1734,7 @@ void GenExpr0(void)
         GenPushReg();
       gotUnary = 0;
       if (maxCallDepth != 1 && v < 16)
-        GenGrowStack(16 - v);
+        GenGrowStack(16 - v); // *PP64 do we need EnsureDivisibleBy8 here? Not sure
       paramOfs = v - 4;
       if (maxCallDepth == 1 && paramOfs >= 0 && paramOfs <= 12)
       {
@@ -1780,6 +1791,15 @@ void GenExpr0(void)
       {
         GenGrowStack(16);
       }
+
+      if (v < 16) // *PP64 moved this up for check below
+        v = 16;
+
+      if (v != EnsureDivisibleBy8(v))
+      {
+        GenGrowStack(4); // *PP64 ensure stack divisible by 8
+      }
+
       if (stack[i - 1][0] == tokIdent)
       {
         GenPrintInstr1Operand(MipsInstrJAL, 0,
@@ -1790,9 +1810,8 @@ void GenExpr0(void)
         GenPrintInstr1Operand(MipsInstrJAL, 0,
                               GenWreg, 0);
       }
-      if (v < 16)
-        v = 16;
-      GenGrowStack(-v);
+
+      GenGrowStack(-EnsureDivisibleBy8(v)); // *PP64 ensure stack divisible by 8
       break;
 
     case tokUnaryStar:

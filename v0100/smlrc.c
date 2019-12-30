@@ -2726,10 +2726,11 @@ int exprUnary(int tok, int* gotUnary, int commaSeparator, int argOfSizeOf)
           puts2(CurHeaderFooter[1]);
         puts2(RoDataHeaderFooter[0]);
 
-#ifndef NO_WCHAR
-        if (wide)
+// *PP64: Always word align strings.
+//#ifndef NO_WCHAR
+//        if (wide)
           GenWordAlignment(0);
-#endif
+//#endif
         GenNumLabel(lbl);
       }
 

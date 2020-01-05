@@ -352,6 +352,22 @@ void GenPrintInstr(int instr, int val)
 #define TEMP_REG_A MipsOpRegT8 // two temporary registers used for momentary operations, similarly to the AT register
 #define TEMP_REG_B MipsOpRegT9
 
+// *PP64 added for stack alignment
+// Assumes v is at least divisible by 4.
+STATIC
+int EnsureDivisibleBy8(int v)
+{
+  if ((v % 8) != 0) {
+    if (v < 0) {
+      v -= 4;
+    }
+    else {
+      v += 4;
+    }
+  }
+  return v;
+}
+
 #ifdef REORDER_WORKAROUND
 STATIC
 void GenNop(void)
@@ -568,7 +584,7 @@ STATIC
 void GenWriteFrameSize(void)
 {
   unsigned size = 8/*RA + FP*/ - CurFxnMinLocalOfs;
-  printf2("\taddiu\t$29, $29, -%-10u\n", size); // 10 chars are enough for 32-bit unsigned ints
+  printf2("\taddiu\t$29, $29, -%-10u\n", EnsureDivisibleBy8(size)); // 10 chars are enough for 32-bit unsigned ints
   printf2("\tsw\t$30, %10u($29)\n", size - 8);
   printf2("\taddiu\t$30, $29, %-10u\n", size - 8);
   printf2("\t%csw\t$31, 4($30)\n", GenLeaf ? ';' : ' '); // *PP64 use ; for comments
@@ -637,7 +653,7 @@ void GenFxnEpilog(void)
   GenPrintInstr3Operands(MipsInstrAddiu, 0,
                          MipsOpRegSp, 0,
                          MipsOpRegSp, 0,
-                         MipsOpConst, 8/*RA + FP*/ - CurFxnMinLocalOfs);
+                         MipsOpConst, EnsureDivisibleBy8(8/*RA + FP*/ - CurFxnMinLocalOfs));
 
   GenPrintInstr1Operand(MipsInstrJR, 0,
                         MipsOpRegRa, 0);
@@ -1601,17 +1617,6 @@ int GenIsCmp(int t)
     t == tokULEQ ||
     t == tokEQ ||
     t == tokNEQ;
-}
-
-// *PP64 added for stack alignment
-// Assumes v is at least divisible by 4.
-STATIC
-int EnsureDivisibleBy8(int v)
-{
-  if ((v % 8) != 0) {
-    v += 4;
-  }
-  return v;
 }
 
 // Improved register/stack-based code generator

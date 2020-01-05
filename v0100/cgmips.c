@@ -584,9 +584,11 @@ STATIC
 void GenWriteFrameSize(void)
 {
   unsigned size = 8/*RA + FP*/ - CurFxnMinLocalOfs;
-  printf2("\taddiu\t$29, $29, -%-10u\n", EnsureDivisibleBy8(size)); // 10 chars are enough for 32-bit unsigned ints
-  printf2("\tsw\t$30, %10u($29)\n", size - 8);
-  printf2("\taddiu\t$30, $29, %-10u\n", size - 8);
+  unsigned safesize = EnsureDivisibleBy8(size);
+  unsigned fpadj = (size != safesize) ? size - 4 : size - 8;
+  printf2("\taddiu\t$29, $29, -%-10u\n", safesize); // 10 chars are enough for 32-bit unsigned ints
+  printf2("\tsw\t$30, %10u($29)\n", fpadj);
+  printf2("\taddiu\t$30, $29, %-10u\n", fpadj);
   printf2("\t%csw\t$31, 4($30)\n", GenLeaf ? ';' : ' '); // *PP64 use ; for comments
 }
 
@@ -1741,6 +1743,9 @@ void GenExpr0(void)
       if (maxCallDepth != 1 && v < 16)
         GenGrowStack(16 - v); // *PP64 do we need EnsureDivisibleBy8 here? Not sure
       paramOfs = v - 4;
+      if (v > 16 && (paramOfs % 8) == 0) {
+        GenGrowStack(4); // *PP64 ensure stack divisible by 8 (before we load all the stack args!)
+      }
       if (maxCallDepth == 1 && paramOfs >= 0 && paramOfs <= 12)
       {
         // Work directly in A0-A3 instead of working in V0 and avoid copying V0 to A0-A3
@@ -1800,10 +1805,10 @@ void GenExpr0(void)
       if (v < 16) // *PP64 moved this up for check below
         v = 16;
 
-      if (v != EnsureDivisibleBy8(v))
-      {
-        GenGrowStack(4); // *PP64 ensure stack divisible by 8
-      }
+      // if (v != EnsureDivisibleBy8(v))
+      // {
+      //   GenGrowStack(4); // *PP64 ensure stack divisible by 8
+      // }
 
       if (stack[i - 1][0] == tokIdent)
       {

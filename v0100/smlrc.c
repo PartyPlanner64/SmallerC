@@ -8342,15 +8342,16 @@ int ParseDecl(int tok, unsigned structInfo[4], int cast, int label)
             tok = GetToken();
           }
 
-          if (!isStruct)
-          {
-            // This is a special case for initialization of integers smaller than int.
-            // Since a local integer variable always takes as much space as a whole int,
-            // we can optimize code generation a bit by storing the initializer as an int.
-            // This is an old accidental optimization and I preserve it for now.
-            // Note, this implies a little-endian CPU.
-            stack[sp - 1][1] = SizeOfWord;
-          }
+          // *PP64 we are big endian MIPS
+          // if (!isStruct)
+          // {
+          //   // This is a special case for initialization of integers smaller than int.
+          //   // Since a local integer variable always takes as much space as a whole int,
+          //   // we can optimize code generation a bit by storing the initializer as an int.
+          //   // This is an old accidental optimization and I preserve it for now.
+          //   // Note, this implies a little-endian CPU.
+          //   stack[sp - 1][1] = SizeOfWord;
+          // }
 
           // Storage of string literal data from the initializing expression
           // occurs here.

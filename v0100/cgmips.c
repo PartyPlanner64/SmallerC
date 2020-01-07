@@ -2409,7 +2409,7 @@ void GenFin(void)
 #ifdef REORDER_WORKAROUND
     GenNop();
 #endif
-    puts2("\tj\t$31");
+    puts2("\tjr\t$31");
 #ifdef REORDER_WORKAROUND
     GenNop();
 #endif
@@ -2446,7 +2446,7 @@ void GenFin(void)
 #endif
     puts2("\tlw\t$2, 0($2)\n"
           "\taddiu\t$29, $29, 4\n"
-          "\tj\t$31");
+          "\tjr\t$31");
 #ifdef REORDER_WORKAROUND
     GenNop();
 #endif

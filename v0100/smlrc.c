@@ -2243,8 +2243,8 @@ int GetToken(void)
         if (FindMacro(TokenIdentName) >= 0)
           error("Redefinition of macro '%s'\n", TokenIdentName);
         if (*p == '(')
-          //error("Unsupported type of macro '%s'\n", TokenIdentName);
-          errorDirective();
+          error("Unsupported type of macro '%s'\n", TokenIdentName);
+          //errorDirective();
 
         AddMacroIdent(TokenIdentName);
 
@@ -2298,8 +2298,8 @@ int GetToken(void)
 
         SkipSpace(0);
         if (!strchr("\r\n", *p))
-          //error("Unsupported or invalid preprocessor directive\n");
-          errorDirective();
+          error("Unsupported or invalid preprocessor directive (include)\n");
+          // *PP64 better errors ^ errorDirective();
 
         if (PrepDontSkipTokens)
           IncludeFile(quot);
@@ -2315,8 +2315,8 @@ int GetToken(void)
         def = FindMacro(TokenIdentName) >= 0;
         SkipSpace(0);
         if (!strchr("\r\n", *p))
-          //error("Invalid preprocessor directive\n");
-          errorDirective();
+          error("Invalid preprocessor directive (ifdef)\n");
+          //errorDirective();
         pushPrep(def);
         continue;
       }
@@ -2329,8 +2329,8 @@ int GetToken(void)
         def = FindMacro(TokenIdentName) >= 0;
         SkipSpace(0);
         if (!strchr("\r\n", *p))
-          //error("Invalid preprocessor directive\n");
-          errorDirective();
+          error("Invalid preprocessor directive (ifndef)\n");
+          //errorDirective();
         pushPrep(!def);
         continue;
       }
@@ -2339,8 +2339,8 @@ int GetToken(void)
         int def;
         SkipSpace(0);
         if (!strchr("\r\n", *p))
-          //error("Invalid preprocessor directive\n");
-          errorDirective();
+          error("Invalid preprocessor directive (else)\n");
+          //errorDirective();
         def = popPrep();
         if (def >= 2)
           error("#else or #endif without #if(n)def\n");
@@ -2351,8 +2351,8 @@ int GetToken(void)
       {
         SkipSpace(0);
         if (!strchr("\r\n", *p))
-          //error("Invalid preprocessor directive\n");
-          errorDirective();
+          error("Invalid preprocessor directive (endif)\n");
+          //errorDirective();
         popPrep();
         continue;
       }
@@ -2370,8 +2370,8 @@ int GetToken(void)
       }
 #endif // #ifndef NO_PREPROCESSOR
 
-      //error("Unsupported or invalid preprocessor directive\n");
-      errorDirective();
+      error("Unsupported or invalid preprocessor directive (unknown)\n");
+      //errorDirective();
     } // endof if (ch == '#')
 
     error("Invalid or unsupported character with code 0x%02X\n", *p & 0xFFu);

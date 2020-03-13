@@ -4,7 +4,7 @@ To build:
 
 - Install emscripten and any dependencies.
 - `cd v0100`
-- `emcc -O3 smlrc.c -o smlrc.html -s MODULARIZE=1 -s 'EXPORT_NAME="SmallerC"' -s EXPORTED_FUNCTIONS='["_main"]' -s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap", "setValue", "FS"]'`
+- `emcc -O3 smlrc.c -o smlrc.js -s MODULARIZE=1 -s 'EXPORT_NAME="SmallerC"' -s EXPORTED_FUNCTIONS='["_main"]' -s 'EXTRA_EXPORTED_RUNTIME_METHODS=["ccall", "cwrap", "setValue", "FS"]'`
 - Copy `smlrc.js` and `smlrc.wasm` to PartyPlanner64 source.
 - In `smlrc.js`, add `/* eslint-disable */`
 

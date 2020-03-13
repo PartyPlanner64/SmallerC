@@ -1558,10 +1558,13 @@ void GenCmp(int* idx, int op)
       constval++;
       // fallthrough
     case 'm':
-      GenPrintInstr3Operands(slti, 0,
-                             GenWreg, 0,
-                             GenWreg, 0,
+      GenPrintInstr2Operands(MipsInstrLI, 0,
+                             MipsOpRegAt, 0,
                              MipsOpConst, constval);
+      GenPrintInstr3Operands(slt, 0,
+                             GenWreg, 0,
+                             GenWreg, 0,
+                             MipsOpRegAt, 0);
       break;
     case 'o':
       GenPrintInstr3Operands(slt, 0,
@@ -1594,10 +1597,13 @@ void GenCmp(int* idx, int op)
                              MipsOpConst, 1);
       break;
     case 't':
-      GenPrintInstr3Operands(MipsInstrXori, 0,
-                             GenWreg, 0,
-                             GenWreg, 0,
+      GenPrintInstr2Operands(MipsInstrLI, 0,
+                             MipsOpRegAt, 0,
                              MipsOpConst, constval);
+      GenPrintInstr3Operands(MipsInstrXor, 0,
+                             GenWreg, 0,
+                             GenWreg, 0,
+                             MipsOpRegAt, 0);
       break;
     }
   }
@@ -1853,18 +1859,38 @@ void GenExpr0(void)
     case '&':
     case '^':
     case '|':
+      if (stack[i - 1][0] == tokNumInt)
+      {
+        int theconst = stack[i - 1][1];
+        int instr = GenGetBinaryOperatorInstr(tok);
+        GenPrintInstr2Operands(MipsInstrLI, 0,
+                               MipsOpRegAt, 0,
+                               MipsOpConst, theconst);
+        GenPrintInstr3Operands(instr, 0,
+                               GenWreg, 0,
+                               GenWreg, 0,
+                               MipsOpRegAt, 0);
+      }
+      else
+      {
+        int instr = GenGetBinaryOperatorInstr(tok);
+        GenPopReg();
+        GenPrintInstr3Operands(instr, 0,
+                               GenWreg, 0,
+                               GenLreg, 0,
+                               GenRreg, 0);
+      }
+      break;
+
+    // *PP64 break out more cases
     case tokLShift:
     case tokRShift:
     case tokURShift:
-      if (stack[i - 1][0] == tokNumInt && tok != '*')
+      if (stack[i - 1][0] == tokNumInt)
       {
         int theconst = stack[i - 1][1];
         int instr = GenGetBinaryOperatorInstr(tok);
         instr = GenImmediateVersionOfInstr(instr);
-        if (instr == MipsInstrSubU) {
-          instr = MipsInstrAddiu;
-          theconst = -theconst;
-        }
         GenPrintInstr3Operands(instr, 0,
                                GenWreg, 0,
                                GenWreg, 0,
@@ -1883,22 +1909,6 @@ void GenExpr0(void)
 
     // *PP64 added case to reduce to 2 regs + mflo
     case '*':
-      if (stack[i - 1][0] == tokNumInt && tok != '*')
-      {
-        int theconst = stack[i - 1][1];
-        int instr = GenGetBinaryOperatorInstr(tok);
-        instr = GenImmediateVersionOfInstr(instr);
-        if (instr == MipsInstrSubU) {
-          instr = MipsInstrAddiu;
-          theconst = -theconst;
-        }
-        GenPrintInstr2Operands(instr, 0,
-                               GenWreg, 0,
-                               MipsOpConst, theconst);
-        GenPrintInstr1Operand(MipsInstrMfLo, 0,
-                                GenWreg, 0);
-      }
-      else
       {
         int instr = GenGetBinaryOperatorInstr(tok);
         GenPopReg();
@@ -1906,7 +1916,7 @@ void GenExpr0(void)
                                GenLreg, 0,
                                GenRreg, 0);
         GenPrintInstr1Operand(MipsInstrMfLo, 0,
-                                GenWreg, 0);
+                              GenWreg, 0);
       }
       break;
 

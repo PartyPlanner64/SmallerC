@@ -1758,9 +1758,23 @@ void GenExpr0(void)
       if (maxCallDepth != 1 && v < 16)
         GenGrowStack(16 - v); // *PP64 do we need EnsureDivisibleBy8 here? Not sure
       paramOfs = v - 4;
-      if (v > 16 && (paramOfs % 8) == 0) {
-        GenGrowStack(4); // *PP64 ensure stack divisible by 8 (before we load all the stack args!)
+      if (v > 16) {
+        // *PP64 ensure stack divisible by 8 (before we load all the stack args!)
+
+        // Are there an odd number of args beyond A3?
+        int paramsWillMisalign = (paramOfs % 8) == 0;
+        if (paramsWillMisalign == 1) {
+          GenGrowStack(4);
+          GenStartCommentLine(); printf2("params misalign fix. TempsUsed: %d\n", TempsUsed);
+        }
       }
+
+      int stackIsMisaligned = TempsUsed % 2 != 0;
+      if (stackIsMisaligned == 1) {
+        GenGrowStack(4);
+        GenStartCommentLine(); printf2("stack misalign fix. TempsUsed: %d\n", TempsUsed);
+      }
+
       if (maxCallDepth == 1 && paramOfs >= 0 && paramOfs <= 12)
       {
         // Work directly in A0-A3 instead of working in V0 and avoid copying V0 to A0-A3
@@ -1820,11 +1834,6 @@ void GenExpr0(void)
       if (v < 16) // *PP64 moved this up for check below
         v = 16;
 
-      // if (v != EnsureDivisibleBy8(v))
-      // {
-      //   GenGrowStack(4); // *PP64 ensure stack divisible by 8
-      // }
-
       if (stack[i - 1][0] == tokIdent)
       {
         GenPrintInstr1Operand(MipsInstrJAL, 0,
@@ -1836,7 +1845,27 @@ void GenExpr0(void)
                               GenWreg, 0);
       }
 
-      GenGrowStack(-EnsureDivisibleBy8(v)); // *PP64 ensure stack divisible by 8
+      // *PP64 ensure stack divisible by 8
+      {
+        if (EnsureDivisibleBy8(v) != v) {
+          GenStartCommentLine(); printf2("params misalign fix undo. TempsUsed: %d\n", TempsUsed);
+        }
+        int stackAdjust = -EnsureDivisibleBy8(v);
+
+        if (TempsUsed > 0) {
+          // At this point, TempsUsed includes temps for A4+ args, which are irrelevant.
+          int relevantTemps = (v > 16) ? (TempsUsed - ((v / 4) - 4)) : TempsUsed;
+          if (relevantTemps > 0) {
+            int stackIsMisaligned = relevantTemps % 2 != 0;
+            if (stackIsMisaligned == 1) {
+              GenStartCommentLine(); printf2("stack misalign fix undo. TempsUsed: %d\n", TempsUsed);
+              stackAdjust -= 4;
+            }
+          }
+        }
+
+        GenGrowStack(stackAdjust);
+      }
       break;
 
     case tokUnaryStar:

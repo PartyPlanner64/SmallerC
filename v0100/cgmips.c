@@ -235,6 +235,9 @@ void GenRecordFxnSize(char* startLabelName, int endLabelNo)
 #define MipsInstrXori   0x2A
 #define MipsInstrOri    0x2B
 #define MipsInstrJR     0x2C
+#define MipsInstrSLLV   0x2E
+#define MipsInstrSRLV   0x2F
+#define MipsInstrSRAV   0x30
 #define MipsInstrSLTI   0x9D
 #define MipsInstrSLTIU  0x9E
 
@@ -291,6 +294,9 @@ void GenPrintInstr(int instr, int val)
   case MipsInstrXori : p = "xori"; break;
   case MipsInstrOri  : p = "ori"; break;
   case MipsInstrJR   : p = "jr"; break;
+  case MipsInstrSLLV : p = "sllv"; break;
+  case MipsInstrSRLV : p = "srlv"; break;
+  case MipsInstrSRAV : p = "srav"; break;
   case MipsInstrSLTI : p = "slti"; break;
   case MipsInstrSLTIU: p = "sltiu"; break;
   }
@@ -715,13 +721,13 @@ int GenGetBinaryOperatorInstr(int tok)
     return MipsInstrDivU;
   case tokLShift:
   case tokAssignLSh:
-    return MipsInstrSLL;
+    return MipsInstrSLLV;
   case tokRShift:
   case tokAssignRSh:
-    return MipsInstrSRA;
+    return MipsInstrSRAV;
   case tokURShift:
   case tokAssignURSh:
-    return MipsInstrSRL;
+    return MipsInstrSRLV;
 
   default:
     //error("Error: Invalid operator\n");
@@ -748,11 +754,14 @@ int GenImmediateVersionOfInstr(int instr)
   case MipsInstrOr:
     return MipsInstrOri;
 
-    // return MipsInstrMul;
+  case MipsInstrSLLV:
+    return MipsInstrSLL;
 
-    // return MipsInstrDiv;
+  case MipsInstrSRAV:
+    return MipsInstrSRA;
 
-    // return MipsInstrDivU;
+  case MipsInstrSRLV:
+    return MipsInstrSRL;
 
   default:
     return instr;

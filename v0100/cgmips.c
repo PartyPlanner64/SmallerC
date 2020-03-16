@@ -1758,21 +1758,24 @@ void GenExpr0(void)
       if (maxCallDepth != 1 && v < 16)
         GenGrowStack(16 - v); // *PP64 do we need EnsureDivisibleBy8 here? Not sure
       paramOfs = v - 4;
-      if (v > 16) {
-        // *PP64 ensure stack divisible by 8 (before we load all the stack args!)
 
-        // Are there an odd number of args beyond A3?
-        int paramsWillMisalign = (paramOfs % 8) == 0;
-        if (paramsWillMisalign == 1) {
-          GenGrowStack(4);
-          GenStartCommentLine(); printf2("params misalign fix. TempsUsed: %d\n", TempsUsed);
+      if (maxCallDepth == 1) {
+        if (v > 16) {
+          // *PP64 ensure stack divisible by 8 (before we load all the stack args!)
+
+          // Are there an odd number of args beyond A3?
+          int paramsWillMisalign = (paramOfs % 8) == 0;
+          if (paramsWillMisalign == 1) {
+            GenGrowStack(4);
+            GenStartCommentLine(); printf2("params misalign fix. TempsUsed: %d\n", TempsUsed);
+          }
         }
-      }
 
-      int stackIsMisaligned = TempsUsed % 2 != 0;
-      if (stackIsMisaligned == 1) {
-        GenGrowStack(4);
-        GenStartCommentLine(); printf2("stack misalign fix. TempsUsed: %d\n", TempsUsed);
+        int stackIsMisaligned = TempsUsed % 2 != 0;
+        if (stackIsMisaligned == 1) {
+          GenGrowStack(4);
+          GenStartCommentLine(); printf2("stack misalign fix. TempsUsed: %d\n", TempsUsed);
+        }
       }
 
       if (maxCallDepth == 1 && paramOfs >= 0 && paramOfs <= 12)
@@ -1846,7 +1849,7 @@ void GenExpr0(void)
       }
 
       // *PP64 ensure stack divisible by 8
-      {
+      if (maxCallDepth == 1) {
         if (EnsureDivisibleBy8(v) != v) {
           GenStartCommentLine(); printf2("params misalign fix undo. TempsUsed: %d\n", TempsUsed);
         }
@@ -1865,6 +1868,9 @@ void GenExpr0(void)
         }
 
         GenGrowStack(stackAdjust);
+      }
+      else {
+        GenGrowStack(-v);
       }
       break;
 
